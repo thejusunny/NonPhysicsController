@@ -7,9 +7,9 @@ using UnityEngine.Assertions.Must;
 public class PlayerController : MonoBehaviour
 {
     // Start is called before the first frame update
-    [SerializeField] private float _radius;
     private CapsuleCollider _capsuleCollider;
-    private const float Gravity = -9.8f;
+    private const float BaseGravity = -9.8f;
+    [SerializeField, Range(1, 10f)] private float _gravityMultiplier=1f;
     [SerializeField] private Vector2 _velocity;
     [SerializeField] private float rayLength = 0.5f;
     private Rigidbody _rigidbody;
@@ -24,9 +24,12 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private MovingPlatform _platformInContact;
     [SerializeField] private float _horizontalMovementSpeed;
     private Vector3 _localpositionOnPlatform;
+    private Vector2 _localVelocity;
     [SerializeField] private Vector2 GlobalVelocity=> _velocity+_movingPlatformVelocity;
-    private Vector2 _movingPlatformVelocity;
-
+    [SerializeField] private Vector2 _globalVelocity;
+    [SerializeField]private Vector2 _movingPlatformVelocity;
+    private float detachTimer;
+    private float Gravity => BaseGravity * _gravityMultiplier;
     void Start()
     {
         _capsuleCollider = GetComponent<CapsuleCollider>();
@@ -41,11 +44,12 @@ public class PlayerController : MonoBehaviour
     private void FixedUpdate()
     {
         PreFixedUpdate();
+        CollisionCheck();
         ApplyGravity();
         Movement();
-        CollisionCheck();
-        SweepTest();
+        //SweepTest();
         MoveRigidbody();
+        _globalVelocity = GlobalVelocity;
         PostFixedUpdate();
     }
 
@@ -62,7 +66,12 @@ public class PlayerController : MonoBehaviour
         {
             _velocity.y = Mathf.Sqrt(-2f * Gravity * jumpHeight);
             if (_platformInContact)
+            {
                 _velocity += _platformInContact.Velocity;
+                _platformInContact = null;
+                detachTimer = Time.time;
+            }
+                
             //Debug.Break();
         }
     }
@@ -73,30 +82,41 @@ public class PlayerController : MonoBehaviour
         if (onGround)
         {
             float distanceBetweenFeetAndGround = Vector3.Distance(FeetPostion, groundHit.point);
-            // MovingPlatform platform = groundHit.transform.GetComponent<MovingPlatform>();
-            // if (platform && distanceBetweenFeetAndGround <= 0.01f)
-            // {
-            //     _movingPlatformVelocity = platform.Velocity;
-            //     _localpositionOnPlatform = platform.transform.InverseTransformPoint(_rigidbody.position);
-            // }
-            // else
-            // {
-            //     _movingPlatformVelocity = Vector2.zero;
-            // }
-
-            if (distanceBetweenFeetAndGround <= 0.01f)
+            if (distanceBetweenFeetAndGround <= 0.05f)
             {
                 flatOnGround = true;
             }
             else
             {
                 flatOnGround = false;
+                return;
             }
+            _platformInContact= groundHit.transform.GetComponent<MovingPlatform>();
+            if(detachTimer +0.1f >Time.time)
+                _platformInContact = null;
+            if (_platformInContact)
+            {
+                _movingPlatformVelocity = _platformInContact.Velocity;
+                _localpositionOnPlatform = _platformInContact.transform.InverseTransformPoint(_rigidbody.position);
+                 _velocity.y = 0f;
+            }
+            else
+            {
+                 DetachFromMovingPlatform();
+            }
+
+           
         }
         else
         {
             flatOnGround = false;
+            DetachFromMovingPlatform();
         }
+    }
+    private void DetachFromMovingPlatform()
+    {
+        _movingPlatformVelocity = Vector2.zero;
+        _platformInContact = null;
     }
 
     private void PreFixedUpdate()
@@ -113,17 +133,15 @@ public class PlayerController : MonoBehaviour
         {
             //_velocity.y = Mathf.Sign(_velocity.y) * hit.distance;
             _platformInContact = hit.transform.GetComponent<MovingPlatform>();
-            if (_platformInContact && hit.distance <=0.1f  )
+            if (_platformInContact && hit.distance <=0.1f)
             {
                 _movingPlatformVelocity = _platformInContact.Velocity;
-                //Debug.Log("Applying");
             }
             else
             {
                 _platformInContact = null;
                 _movingPlatformVelocity = Vector3.zero;
             }
-            //Debug.Log("Applying"+ hit.distance);
         }
         else
         {
@@ -138,7 +156,6 @@ public class PlayerController : MonoBehaviour
 
     public void OnCollisionStay(Collision collision)
     {
-        MovingPlatform _platform = collision.transform.GetComponent<MovingPlatform>();
         OnCollison(collision);
     }
 
@@ -161,9 +178,10 @@ public class PlayerController : MonoBehaviour
         if (flatOnGround && _velocity.y < 0)
             _velocity.y = 0f;
     }
-
     private void MoveRigidbody()
     {
+        if(Mathf.Abs(_velocity.x)>0f && Mathf.Sign(_velocity.x)!= Mathf.Sign(_movingPlatformVelocity.x))
+            _movingPlatformVelocity.x = 0f;
         _rigidbody.velocity = _velocity + _movingPlatformVelocity;
     }
 }
