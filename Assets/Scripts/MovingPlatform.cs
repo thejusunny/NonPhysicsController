@@ -13,6 +13,7 @@ public class MovingPlatform : MonoBehaviour
     public Vector2 Velocity => _velocity;
     private float _directionChangeTimestamp;
     [SerializeField]private float _movementSpeed;
+    [SerializeField] private float _directionReverseFrequency=2.5f;
     void Start()
     {
         _rigidbody = GetComponent<Rigidbody>();
@@ -23,7 +24,7 @@ public class MovingPlatform : MonoBehaviour
 
     public  void PreFixedUpdate()
     {
-        if (Time.time > _directionChangeTimestamp + 2.5f)
+        if (Time.time > _directionChangeTimestamp + _directionReverseFrequency)
         {
             direction *= -1;
             _directionChangeTimestamp = Time.time;
@@ -32,6 +33,7 @@ public class MovingPlatform : MonoBehaviour
         Vector3 nextPosition = _rigidbody.position + _movementSpeed * (Vector3) direction * Time.fixedDeltaTime;
         _rigidbody.MovePosition(nextPosition);
         _velocity = (nextPosition - _rigidbody.position)/Time.fixedDeltaTime;
+        _rigidbody.velocity = _velocity;
         prevPosition = _rigidbody.position;
         // Debug.Log(_rigidbody.position+ _movementSpeed*(Vector3) direction* Time.fixedDeltaTime);
         // Debug.Log(_rigidbody.position);
