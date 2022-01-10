@@ -30,6 +30,12 @@ public class PlayerController : MonoBehaviour
     [SerializeField]private Vector2 _movingPlatformVelocity;
     private float detachTimer;
     private float Gravity => BaseGravity * _gravityMultiplier;
+    [SerializeField, Range(0.1f,10f)]private float _dashDistance=3f;
+    [SerializeField, Range(0.05f,0.5f)] private float _dashDuration;
+    private bool _isDashing;
+    private Vector2 _dashInputXY;
+    [SerializeField]private float _facingDirection=1;
+    private Vector2 _dashStartPosition;
     void Start()
     {
         _capsuleCollider = GetComponent<CapsuleCollider>();
@@ -43,6 +49,8 @@ public class PlayerController : MonoBehaviour
         {
             Jump();
         }
+        if(DashInput())
+            Dash();
     }
     // Update is called once per frame
     private void FixedUpdate()
@@ -61,12 +69,62 @@ public class PlayerController : MonoBehaviour
     }
     private void Movement()
     {
-        _velocity.x = Input.GetAxisRaw("Horizontal") * _horizontalMovementSpeed;
+        float inputX =Input.GetAxisRaw("Horizontal");
+        if(Mathf.Abs(inputX)>0)
+            _facingDirection= inputX;
+        if(_isDashing)
+        {
+            Vector2 dashDirection = _dashInputXY;
+            if(_dashInputXY.magnitude>1)
+            {
+                dashDirection = _dashInputXY.normalized;
+            }
+            else if(_dashInputXY.magnitude<=0)
+            {
+                dashDirection.x = _facingDirection;
+            }
+            float speed = _dashDistance/ _dashDuration;
+            if(speed % _dashDistance ==0)
+            {
+                //ebug.Log("Linear speed");
+            }
+            _velocity = dashDirection * speed;
+            Vector3 lastPoint = _dashStartPosition + dashDirection*_dashDistance;
+            float completion = InverseLerp(_dashStartPosition, lastPoint, _rigidbody.position);
+            if(completion>0.99f)
+            {
+                _isDashing = false;
+                _velocity *=0.5f;
+                //_velocity *=0.25f;
+            }
+            return;
+        }
+        _velocity.x = Mathf.Lerp(_velocity.x, inputX * _horizontalMovementSpeed, _horizontalMovementSpeed*Time.fixedDeltaTime);
+
         //Debug.Log(_inputVelocityX);
     }
+    public static float InverseLerp(Vector3 a, Vector3 b, Vector3 value)
+     {
+         Vector3 AB = b - a;
+         Vector3 AV = value - a;
+         return Vector3.Dot(AV, AB) / Vector3.Dot(AB, AB);
+     }
     private bool JumpInput()
     {
         return Input.GetKeyDown(KeyCode.Space);
+    }
+    private bool DashInput()
+    {
+        return Input.GetKeyDown(KeyCode.Z);
+    }
+    private void Dash()
+    {
+        if(_isDashing)
+            return;
+        _isDashing = true;
+        _dashStartPosition = _rigidbody.position;
+        _dashInputXY.x = Input.GetAxisRaw("Horizontal");
+        _dashInputXY.y = Input.GetAxisRaw("Vertical");
     }
     private void Jump()
     {
@@ -183,7 +241,6 @@ public class PlayerController : MonoBehaviour
             MovingPlatform movingPlatform = hit.transform.GetComponent<MovingPlatform>();
             if(movingPlatform)
             return;
-            Debug.Log("Sweep");
             _rigidbody.velocity = _velocity = _rigidbody.velocity.normalized *(hit.distance/ Time.fixedDeltaTime);
         }
     }
@@ -212,6 +269,8 @@ public class PlayerController : MonoBehaviour
 
     private void ApplyGravity()
     {
+       if(_isDashing)
+       return;
         _velocity += Vector2.up * Gravity * Time.fixedDeltaTime;
         if (flatOnGround && _velocity.y < 0)
             _velocity.y = 0f;
