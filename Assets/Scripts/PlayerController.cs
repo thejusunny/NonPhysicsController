@@ -36,6 +36,7 @@ public class PlayerController : MonoBehaviour
     private Vector2 _dashInputXY;
     [SerializeField]private float _facingDirection=1;
     private Vector2 _dashStartPosition;
+    float _horizontalVelocity;
     void Start()
     {
         _capsuleCollider = GetComponent<CapsuleCollider>();
@@ -99,7 +100,8 @@ public class PlayerController : MonoBehaviour
             }
             return;
         }
-        _velocity.x = Mathf.Lerp(_velocity.x, inputX * _horizontalMovementSpeed, _horizontalMovementSpeed*Time.fixedDeltaTime);
+        _velocity.x = inputX* _horizontalMovementSpeed;
+        //Mathf.Lerp(_velocity.x, inputX * _horizontalMovementSpeed, _horizontalMovementSpeed*Time.fixedDeltaTime);
 
         //Debug.Log(_inputVelocityX);
     }
@@ -154,9 +156,81 @@ public class PlayerController : MonoBehaviour
             else
             {
                 flatOnGround = false;
+                //return;
+            }
+            // _platformInContact= groundHit.transform.GetComponent<MovingPlatform>();
+            // if(detachTimer +0.1f >Time.time)
+            //     _platformInContact = null;
+            // if (_platformInContact)
+            // {
+            //     _movingPlatformVelocity = _platformInContact.Velocity;
+            //     _localpositionOnPlatform = _platformInContact.transform.InverseTransformPoint(_rigidbody.position);
+            //      _velocity.y = 0f;
+            // }
+            // else
+            // {
+            //      DetachFromMovingPlatform();
+            // }
+        }
+        else
+        {
+            flatOnGround = false;
+            //DetachFromMovingPlatform();
+        }
+        RaycastHit leftHit, rightHit, downHit;
+        bool leftSweep = CapsuleCastWrapper(_rigidbody.position, _capsuleCollider.height,_capsuleCollider.radius*0.9f,Vector2.left,0.15f,out leftHit);
+        bool rightSweep = CapsuleCastWrapper(_rigidbody.position, _capsuleCollider.height,_capsuleCollider.radius*0.9f,Vector2.right,0.15f,out rightHit);
+        bool downSweep = CapsuleCastWrapper(_rigidbody.position, _capsuleCollider.height,_capsuleCollider.radius*0.9f,Vector2.down,0.3f,out downHit);
+        //_rigidbody.SweepTest(Vector3.down, out downHit, 0.1f);
+        MovingPlatform movingPlatform = null;
+        if(leftSweep)
+        {
+             _platformInContact= leftHit.transform.GetComponent<MovingPlatform>();
+            if(_platformInContact)
+            {
+                if(Vector2.Dot(_platformInContact.Velocity, Vector2.left)>0)
+                {
+                    DetachFromMovingPlatform();
+                    return;
+                }
+                UpdatePlayerOnMovingPlatform();
+                 return;
+            }
+        }
+        if(rightSweep)
+        {
+             _platformInContact= rightHit.transform.GetComponent<MovingPlatform>();
+            if(_platformInContact)
+            {
+                if(Vector2.Dot(_platformInContact.Velocity, Vector2.right)>0)
+                {
+                    DetachFromMovingPlatform();
+                    return;
+                }
+                UpdatePlayerOnMovingPlatform();
                 return;
             }
-            _platformInContact= groundHit.transform.GetComponent<MovingPlatform>();
+        }
+        if(downSweep)
+        {
+            _platformInContact= downHit.transform.GetComponent<MovingPlatform>();
+            if(_platformInContact)
+            {
+               
+                UpdatePlayerOnMovingPlatform();
+                 return;
+            }
+        }
+        if(!downSweep&& !rightSweep&& !leftSweep)
+            DetachFromMovingPlatform();
+    }
+    bool  CapsuleCastWrapper(Vector3 pos, float height, float radius,Vector2 direction,float distance,out  RaycastHit hit)
+    {
+        return Physics.CapsuleCast(pos+Vector3.up*(height/2- radius), pos + Vector3.down* (height/2-radius), radius, direction,out hit,distance);
+    }
+    private void UpdatePlayerOnMovingPlatform()
+    {
+            
             if(detachTimer +0.1f >Time.time)
                 _platformInContact = null;
             if (_platformInContact)
@@ -169,52 +243,7 @@ public class PlayerController : MonoBehaviour
             {
                  DetachFromMovingPlatform();
             }
-        }
-        else
-        {
-            flatOnGround = false;
-            DetachFromMovingPlatform();
-        }
-
     }
-    // private void CollisionCheck()
-    // {
-    //     RaycastHit groundHit;
-    //     bool onGround = Physics.Raycast(FeetPostionWithOffset, Vector3.down, out groundHit, rayLength); // Boxcast
-    //     if (onGround)
-    //     {
-    //         float distanceBetweenFeetAndGround = Vector3.Distance(FeetPostion, groundHit.point);
-    //         if (distanceBetweenFeetAndGround <= 0.05f)
-    //         {
-    //             flatOnGround = true;
-    //         }
-    //         else
-    //         {
-    //             flatOnGround = false;
-    //             return;
-    //         }
-    //         _platformInContact= groundHit.transform.GetComponent<MovingPlatform>();
-    //         if(detachTimer +0.1f >Time.time)
-    //             _platformInContact = null;
-    //         if (_platformInContact)
-    //         {
-    //             _movingPlatformVelocity = _platformInContact.Velocity;
-    //             _localpositionOnPlatform = _platformInContact.transform.InverseTransformPoint(_rigidbody.position);
-    //              _velocity.y = 0f;
-    //         }
-    //         else
-    //         {
-    //              DetachFromMovingPlatform();
-    //         }
-
-           
-    //     }
-    //     else
-    //     {
-    //         flatOnGround = false;
-    //         DetachFromMovingPlatform();
-    //     }
-    // }
     private void DetachFromMovingPlatform()
     {
         _movingPlatformVelocity = Vector2.zero;
@@ -241,14 +270,15 @@ public class PlayerController : MonoBehaviour
             MovingPlatform movingPlatform = hit.transform.GetComponent<MovingPlatform>();
             if(movingPlatform)
             return;
+             _horizontalVelocity = _rigidbody.velocity.x;
             _rigidbody.velocity = _velocity = _rigidbody.velocity.normalized *(hit.distance/ Time.fixedDeltaTime);
         }
     }
     public void OnCollisionEnter(Collision collision)
     {
+        _velocity.x = _horizontalVelocity;
         OnCollison(collision);
     }
-
     public void OnCollisionStay(Collision collision)
     {
         OnCollison(collision);
@@ -256,15 +286,7 @@ public class PlayerController : MonoBehaviour
 
     private void OnCollison(Collision collision)
     {
-        // for (int i = 0; i < collision.contactCount; i++)
-        // {
-        //     ContactPoint contactPoint = collision.contacts[i];
-        //     MovingPlatform platform = collision.transform.GetComponent<MovingPlatform>();
-        //     if (platform)
-        //     {
-        //         platformInContact = platform;
-        //     }
-        // }
+        
     }
 
     private void ApplyGravity()
