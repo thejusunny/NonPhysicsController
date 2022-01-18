@@ -14,6 +14,7 @@ public class MovingPlatform : MonoBehaviour
     private float _directionChangeTimestamp;
     [SerializeField]private float _movementSpeed;
     [SerializeField] private float _directionReverseFrequency=2.5f;
+    public Vector2 Position=> _rigidbody.position;
     void Start()
     {
         _rigidbody = GetComponent<Rigidbody>();

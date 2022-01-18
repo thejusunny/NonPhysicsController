@@ -1,0 +1,49 @@
+﻿using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+namespace KinematicCharacterController.Examples
+{
+    public class ExampleMovingPlatform : MonoBehaviour, IMoverController
+    {
+        public PhysicsMover Mover;
+
+        public Vector3 TranslationAxis = Vector3.right;
+        public float TranslationPeriod = 10;
+        public float TranslationSpeed = 1;
+        public Vector3 RotationAxis = Vector3.up;
+        public float RotSpeed = 10;
+        public Vector3 OscillationAxis = Vector3.zero;
+        public float OscillationPeriod = 10;
+        public float OscillationSpeed = 10;
+
+        private Vector3 _originalPosition;
+        private Quaternion _originalRotation;
+        [SerializeField] float timeToReverseDirection;
+        float timeStamp;
+        [SerializeField] float movementSpeed;
+        Vector3 startPos;
+        
+        private void Start()
+        {
+            _originalPosition = Mover.Rigidbody.position;
+            _originalRotation = Mover.Rigidbody.rotation;
+            startPos = Mover.GetComponent<Rigidbody>().position;
+            Mover.MoverController = this;
+        }
+
+        public void UpdateMovement(out Vector3 goalPosition, out Quaternion goalRotation, float deltaTime)
+        {
+            if(Time.time> timeStamp+ timeToReverseDirection)
+            {
+                timeStamp = Time.time;
+                TranslationAxis *=-1;
+            }
+            startPos = startPos+ TranslationAxis.normalized * movementSpeed* deltaTime;
+            goalPosition = startPos;
+            //goalPosition = (_originalPosition + (TranslationAxis.normalized * Mathf.Sin(Time.time * TranslationSpeed) * TranslationPeriod));
+            Quaternion targetRotForOscillation = Quaternion.Euler(OscillationAxis.normalized * (Mathf.Sin(Time.time * OscillationSpeed) * OscillationPeriod)) * _originalRotation;
+            goalRotation = Quaternion.Euler(RotationAxis * RotSpeed * Time.time) * targetRotForOscillation;
+        }
+    }
+}
